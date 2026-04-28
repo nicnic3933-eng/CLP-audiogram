@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator - Refined NR Symbols</title>
+    <title>Audiogram Creator - Shortened NR Arrows</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -173,6 +173,7 @@
         let angle;
         let startOffsetX = 0;
         let startOffsetY = 0;
+        let arrowLen = 25; // Default shaft length
 
         // Base angles
         if (type === 'RAC') angle = 45;
@@ -180,31 +181,30 @@
         else if (type === 'RBC') angle = 135;
         else if (type === 'LBC') angle = 45;
 
-        // Apply specific requested offsets
+        const rads = angle * Math.PI / 180;
+
         if (type.endsWith('BC')) {
-            // BC: Start arrow from the bottom of the shape (<, >, [, or ])
+            // BC: Start arrow from bottom of bracket
             startOffsetY = 9; 
         } else if (type.endsWith('AC') && isMasked) {
-            // AC Masked: Shorten shaft (start further outside symbol)
-            // Push start point further out based on the arrow direction
+            // AC Masked: Shift start point out and reduce length by same amount
             const pushOut = 10;
-            startOffsetX = Math.cos(angle * Math.PI / 180) * pushOut;
-            startOffsetY = Math.sin(angle * Math.PI / 180) * pushOut;
+            startOffsetX = Math.cos(rads) * pushOut;
+            startOffsetY = Math.sin(rads) * pushOut;
+            arrowLen -= pushOut; // Shorten the shaft
         }
 
         const startX = x + startOffsetX;
         const startY = y + startOffsetY;
-        const rads = angle * Math.PI / 180;
-        const len = 25; // Length of the shaft
-        const endX = startX + Math.cos(rads) * len;
-        const endY = startY + Math.sin(rads) * len;
+        const endX = startX + Math.cos(rads) * arrowLen;
+        const endY = startY + Math.sin(rads) * arrowLen;
 
         ctx.beginPath();
         ctx.lineWidth = 2.5;
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
         
-        const h = 8;
+        const h = 8; // Head size
         ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
         ctx.moveTo(endX, endY);
         ctx.lineTo(endX - h * Math.cos(rads + Math.PI/6), endY - h * Math.sin(rads + Math.PI/6));
