@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator - Fixed Frequency Scaling</title>
+    <title>Audiogram Creator - Verified Scaling</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -51,7 +51,7 @@
     </div>
 
     <div class="instructions">
-        <strong>Shortcut Rules:</strong> [Number]<b>m</b> = Masked | [Number]<b>n</b> = NR | [Number]<b>mn</b> = Masked NR
+        <strong>Shortcuts:</strong> [Value]<b>m</b> = Masked | [Value]<b>n</b> = NR Arrow | [Value]<b>mn</b> = Masked NR
     </div>
 
     <div class="toolbar">
@@ -67,7 +67,7 @@
     const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
     const bcAllowed = [500, 1000, 2000, 4000];
 
-    // Calibration: X_STEP is now the distance between full octaves (e.g., 1000 to 2000)
+    // Using your confirmed working calibration
     const CAL = {
         R_X_START: 125, 
         L_X_START: 766, 
@@ -76,15 +76,15 @@
         Y_STEP_10: 38.1
     };
 
-    // This map determines how many "X_STEPs" a frequency is from the start
+    // Using your confirmed freq mapping for accurate 3k/6k placement
     const FREQ_MAP = {
         250: 0, 
         500: 1, 
         1000: 2, 
         2000: 3, 
-        3000: 3.5, // Half-way between 2k and 4k
+        3000: 3.61, 
         4000: 4, 
-        6000: 4.5, // Half-way between 4k and 8k
+        6000: 4.61, 
         8000: 5
     };
 
@@ -133,7 +133,7 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
-        // AC Lines
+        // Draw AC Connecting Lines (Skip NR values)
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
             const points = allInputs
@@ -142,14 +142,14 @@
                 .sort((a, b) => a.f - b.f);
 
             if (points.length > 1) {
-                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = "round";
                 ctx.moveTo(points[0].x, points[0].y);
                 points.forEach(p => ctx.lineTo(p.x, p.y));
                 ctx.stroke();
             }
         });
 
-        // Symbols
+        // Draw Individual Symbols
         allInputs.forEach(i => {
             const val = i.value.toLowerCase();
             const db = parseFloat(val);
@@ -184,11 +184,13 @@
 
     function drawArrow(x, y, type) {
         let angle;
-        // Directional Logic
-        if (type === 'RAC') angle = 45;      // Bottom Right
-        else if (type === 'LAC') angle = 90; // Downward
-        else if (type === 'RBC') angle = 135; // Bottom Left
-        else if (type === 'LBC') angle = 45;  // Bottom Right
+        // logic for directions: 
+        // RAC: Bottom-Right (45) | LAC: Straight-Down (90)
+        // RBC: Bottom-Left (135) | LBC: Bottom-Right (45)
+        if (type === 'RAC') angle = 45;
+        else if (type === 'LAC') angle = 90;
+        else if (type === 'RBC') angle = 135;
+        else if (type === 'LBC') angle = 45;
 
         const rads = angle * Math.PI / 180;
         const len = 25;
@@ -201,6 +203,7 @@
         ctx.lineTo(endX, endY);
         
         const h = 8;
+        // Arrowhead logic
         ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
         ctx.moveTo(endX, endY);
         ctx.lineTo(endX - h * Math.cos(rads + Math.PI/6), endY - h * Math.sin(rads + Math.PI/6));
