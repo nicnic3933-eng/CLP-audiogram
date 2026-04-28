@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audiogram Creator</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .app-container { display: flex; gap: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        table { border-collapse: collapse; margin-bottom: 15px; font-size: 0.9rem; }
+        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        input { width: 45px; padding: 4px; text-align: center; border: 1px solid #ccc; border-radius: 3px; }
+        input:focus { outline: none; border-color: #007bff; background: #f0f7ff; }
+        canvas { border: 1px solid #999; }
+        .controls { display: flex; gap: 10px; }
+        button { padding: 8px 15px; cursor: pointer; background: #28a745; color: white; border: none; border-radius: 4px; }
+        .legend { font-size: 0.75rem; color: #666; max-width: 300px; line-height: 1.4; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div>
+        <table id="entryGrid">
+            <thead>
+                <tr>
+                    <th>Hz</th>
+                    <th>R-AC</th>
+                    <th>R-BC</th>
+                    <th>L-AC</th>
+                    <th>L-BC</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <div class="legend">
+            <strong>Modifier Keys:</strong><br>
+            • <b>m</b>: Masked symbol<br>
+            • <b>n</b>: No Response arrow<br>
+            • <b>mn</b>: Masked No Response
+        </div>
+        <div class="controls">
+            <button onclick="download()">Download PNG</button>
+            <button onclick="location.reload()" style="background:#dc3545">Reset</button>
+        </div>
+    </div>
+
+    <canvas id="audioCanvas" width="1024" height="500"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('audioCanvas');
+    const ctx = canvas.getContext('2d');
+    const freqs = [125, 250, 500, 1000, 2000, 4000, 8000];
+    
+    // --- CALIBRATION AREA ---
+    // You will need to adjust these numbers once to align with your specific image
+    const CAL = {
+        R_X_START: 85,   // X-pixel for Right ear 125Hz
+        L_X_START: 575,  // X-pixel for Left ear 125Hz
+        X_STEP: 61,      // Horizontal pixels between frequencies
+        Y_ZERO: 65,      // Y-pixel where 0dB is located
+        Y_STEP_10: 36    // Vertical pixels for every 10dB
+    };
+
+    const bgImage = new Image();
+    bgImage.src = 'template.png'; // MAKE SURE FILENAME MATCHES YOUR FILE
+    bgImage.onload = () => drawAll(); 
+
+    // Build Table
+    const tbody = document.querySelector('#entryGrid tbody');
+    freqs.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${f}</td>` + 
+            ['RAC','RBC','LAC','LBC'].map(t => `<td><input type="text" data-f="${f}" data-t="${t}" class="in"></td>`).join('');
+        tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.in').forEach(i => i.addEventListener('input', drawAll));
+
+    function getPos(type, freq, val) {
+        const fIdx = freqs.indexOf(parseInt(freq));
+        const db = parseFloat(val);
+        const isLeft = type.startsWith('L');
+        return {
+            x: (isLeft ? CAL.L_X_START : CAL.R_X_START) + (fIdx * CAL.X_STEP),
+            y: CAL.Y_ZERO + (db * (CAL.Y_STEP_10 / 10))
+        };
+    }
+
+    function drawAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+
+        const inputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
+        
+        // 1. Draw AC Lines
+        ['RAC', 'LAC'].forEach(type => {
+            const color = type.startsWith('R') ? 'red' : 'blue';
+            const points = inputs
+                .filter(i => i.dataset.t === type && !i.value.toLowerCase().includes('n'))
+                .map(i => ({...getPos(type, i.dataset.f, i.value), f: parseInt(i.dataset.f)}))
+                .sort((a,b) => a.f - b.f);
+
+            if (points.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 2;
+                ctx.moveTo(points[0].x, points[0].y);
+                points.forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+            }
+        });
+
+        // 2. Draw Symbols
+        inputs.forEach(i => {
+            const val = i.value.toLowerCase();
+            const pos = getPos(i.dataset.t, i.dataset.f, val);
+            renderSymbol(i.dataset.t, pos, val);
+        });
+    }
+
+    function renderSymbol(type, pos, val) {
+        const {x, y} = pos;
+        const isM = val.includes('m');
+        const isN = val.includes('n');
+        ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        if (type === 'RAC') {
+            isM ? (ctx.moveTo(x,y-7), ctx.lineTo(x-7,y+5), ctx.lineTo(x+7,y+5), ctx.closePath()) : ctx.arc(x,y,6,0,7);
+        } else if (type === 'LAC') {
+            isM ? ctx.rect(x-6,y-6,12,12) : (ctx.moveTo(x-6,y-6), ctx.lineTo(x+6,y+6), ctx.moveTo(x+6,y-6), ctx.lineTo(x-6,y+6));
+        } else if (type === 'RBC') {
+            isM ? (ctx.moveTo(x+7,y-7), ctx.lineTo(x,y-7), ctx.lineTo(x,y+7), ctx.lineTo(x+7,y+7)) : (ctx.moveTo(x+7,y-7), ctx.lineTo(x,y), ctx.lineTo(x+7,y+7));
+        } else if (type === 'LBC') {
+            isM ? (ctx.moveTo(x-7,y-7), ctx.lineTo(x,y-7), ctx.lineTo(x,y+7), ctx.lineTo(x-7,y+7)) : (ctx.moveTo(x-7,y-7), ctx.lineTo(x,y), ctx.lineTo(x-7,y+7));
+        }
+        ctx.stroke();
+
+        if (isN) {
+            const angle = type.startsWith('R') ? 0.7 : 2.4;
+            ctx.beginPath();
+            ctx.moveTo(x,y);
+            ctx.lineTo(x + Math.cos(angle)*18, y + Math.sin(angle)*18);
+            ctx.stroke();
+        }
+    }
+
+    function download() {
+        const link = document.createElement('a');
+        link.download = 'audiogram.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    }
+</script>
+</body>
+</html>
