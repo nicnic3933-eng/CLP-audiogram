@@ -3,32 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator - Precision Line Gaps</title>
+    <title>CLP Audiogram Generator</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
-        .input-wrapper { display: flex; gap: 30px; margin-bottom: 20px; }
+        .app-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; max-width: 900px; }
+        
+        h1 { margin-top: 0; color: #333; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        
+        .intro-section { background: #eef2f7; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; color: #444; line-height: 1.5; }
+        .intro-section p { margin: 8px 0; }
+
+        .input-wrapper { display: flex; gap: 30px; margin-bottom: 25px; justify-content: center; }
         h3 { margin: 0 0 10px 0; font-size: 1.1rem; text-align: center; }
         .red-text { color: #d32f2f; }
         .blue-text { color: #1976d2; }
+        
         table { border-collapse: collapse; background: #fff; }
         th, td { border: 1px solid #dee2e6; padding: 4px 8px; text-align: center; }
         th { background: #f8f9fa; font-size: 0.8rem; font-weight: 600; }
+        
         input { width: 55px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         input:focus { border-color: #007bff; outline: none; background: #f0f7ff; }
         input:disabled { background: #f1f1f1; cursor: not-allowed; border-color: #eee; }
-        .canvas-container { position: relative; border: 2px solid #333; line-height: 0; overflow: auto; max-width: 95vw; }
+        
+        .canvas-container { position: relative; border: 2px solid #333; line-height: 0; overflow: auto; margin-top: 10px; }
         canvas { background: #fff; display: block; }
-        .toolbar { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
-        button { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        
+        .toolbar { margin-top: 20px; display: flex; gap: 15px; justify-content: center; }
+        button { padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
         .btn-save { background: #28a745; color: white; }
         .btn-reset { background: #6c757d; color: white; }
-        .instructions { font-size: 0.85rem; color: #555; margin-top: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; text-align: center; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
+    <h1>CLP Audiogram Generator</h1>
+
+    <div class="intro-section">
+        <p>Input the thresholds below to generate the audiogram. Add suffices to make it masked or no response. e.g. 5m = 5 dB masked, 105n = NR at 105 dB, 80mn = NR at 80 dB masked.</p>
+        <p>Copy the output diagram and set the height of the pasted diagram to be <strong>7.7 cm</strong>.</p>
+    </div>
+
     <div class="input-wrapper">
         <div>
             <h3 class="red-text">RIGHT EAR</h3>
@@ -48,10 +65,6 @@
 
     <div class="canvas-container">
         <canvas id="audioCanvas"></canvas>
-    </div>
-
-    <div class="instructions">
-        <strong>Shortcuts:</strong> [Value]<b>m</b> = Masked | [Value]<b>n</b> = NR Arrow | [Value]<b>mn</b> = Masked NR
     </div>
 
     <div class="toolbar">
@@ -123,7 +136,7 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
-        // AC Drawing with Line Gaps
+        // AC Drawing Logic
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
             ctx.strokeStyle = color;
@@ -155,10 +168,10 @@
         });
     }
 
-    // Helper to draw lines that don't touch symbols
+    // GAP LOGIC: Shortens line segments to avoid touching symbols
     function drawSegmentedPath(points) {
         if (points.length < 2) return;
-        const gap = 9; // radius + 1px
+        const gap = 11; // Increased to 11px (Radius + 3px)
 
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
