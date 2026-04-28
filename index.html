@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Clinical Audiogram Plotter</title>
+    <title>Audiogram Creator Pro</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -17,14 +17,13 @@
         input { width: 55px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         input:focus { border-color: #007bff; outline: none; background: #f0f7ff; }
         input:disabled { background: #f1f1f1; cursor: not-allowed; border-color: #eee; }
-        .canvas-container { position: relative; border: 2px solid #333; line-height: 0; }
-        canvas { background: #fff; max-width: 100%; height: auto; }
+        .canvas-container { position: relative; border: 2px solid #333; line-height: 0; overflow: auto; max-width: 95vw; }
+        canvas { background: #fff; display: block; }
         .toolbar { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
-        button { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        button { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .btn-save { background: #28a745; color: white; }
         .btn-reset { background: #6c757d; color: white; }
-        button:hover { opacity: 0.9; }
-        .instructions { font-size: 0.85rem; color: #555; margin-top: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; }
+        .instructions { font-size: 0.85rem; color: #555; margin-top: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; text-align: center;}
     </style>
 </head>
 <body>
@@ -32,7 +31,7 @@
 <div class="app-container">
     <div class="input-wrapper">
         <div>
-            <h3 class="red-text">RIGHT EAR (O / &lt;)</h3>
+            <h3 class="red-text">RIGHT EAR</h3>
             <table id="rightGrid">
                 <thead><tr><th>Hz</th><th>AC</th><th>BC</th></tr></thead>
                 <tbody id="rightBody"></tbody>
@@ -40,7 +39,7 @@
         </div>
 
         <div>
-            <h3 class="blue-text">LEFT EAR (X / &gt;)</h3>
+            <h3 class="blue-text">LEFT EAR</h3>
             <table id="leftGrid">
                 <thead><tr><th>Hz</th><th>AC</th><th>BC</th></tr></thead>
                 <tbody id="leftBody"></tbody>
@@ -49,11 +48,11 @@
     </div>
 
     <div class="canvas-container">
-        <canvas id="audioCanvas" width="1024" height="600"></canvas>
+        <canvas id="audioCanvas"></canvas>
     </div>
 
     <div class="instructions">
-        <strong>Shortcut Rules:</strong> Type <b>"m"</b> for Masked (e.g., 20m) • Type <b>"n"</b> for No Response (e.g., 40n) • Type <b>"mn"</b> for Masked NR.
+        <strong>Shortcut Rules:</strong> [Number] = Unmasked • [Number]<b>m</b> = Masked • [Number]<b>n</b> = NR (Arrow) • [Number]<b>mn</b> = Masked NR
     </div>
 
     <div class="toolbar">
@@ -61,84 +60,140 @@
         <button class="btn-reset" onclick="location.reload()">Clear All Data</button>
     </div>
 </div>
-// Replace your existing <script> section with this updated logic
 
-const canvas = document.getElementById('audioCanvas');
-const ctx = canvas.getContext('2d');
-const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
-const bcAllowed = [500, 1000, 2000, 4000];
+<script>
+    const canvas = document.getElementById('audioCanvas');
+    const ctx = canvas.getContext('2d');
 
-// --- CALIBRATION ADJUSTMENT ---
-// If symbols are still slightly off, change these numbers by 1 or 2 pixels
-const CAL = {
-    R_X_START: 130,   // Starting X for Right 250Hz
-    L_X_START: 635,   // Starting X for Left 250Hz
-    X_STEP: 53.8,     // Horizontal distance between freq lines
-    Y_ZERO: 75,       // Vertical pixel for 0 dB
-    Y_STEP_10: 38.8   // Vertical pixels for every 10 dB
-};
+    // Frequencies per your requirement
+    const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
+    const bcAllowed = [500, 1000, 2000, 4000];
 
-const bgImage = new Image();
-bgImage.src = 'template.png'; 
+    // --- CALIBRATION ---
+    // Adjust these slightly to hit the exact center of your lines
+    const CAL = {
+        R_X_START: 132,   // X-pixel for Right 250Hz
+        L_X_START: 635,   // X-pixel for Left 250Hz
+        X_STEP: 53.6,     // Pixels between freq lines
+        Y_ZERO: 72,       // Y-pixel for 0 dB
+        Y_STEP_10: 38.6   // Y-pixels for every 10 dB
+    };
 
-bgImage.onload = () => {
-    // This prevents the "squeezing" by forcing the canvas 
-    // to be the exact size of your original image file.
-    canvas.width = bgImage.naturalWidth;
-    canvas.height = bgImage.naturalHeight;
-    drawAll();
-};
-
-function drawAll() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const bgImage = new Image();
+    bgImage.src = 'template.png'; 
     
-    // Draw the background image at its natural size
-    if (bgImage.complete) {
-        ctx.drawImage(bgImage, 0, 0);
+    bgImage.onload = () => {
+        // Fix for the "squeezing" issue: Canvas matches image natural size
+        canvas.width = bgImage.naturalWidth;
+        canvas.height = bgImage.naturalHeight;
+        drawAll();
+    };
+
+    function initGrids() {
+        const sides = { 'R': 'rightBody', 'L': 'leftBody' };
+        for (let side in sides) {
+            const tbody = document.getElementById(sides[side]);
+            freqs.forEach(f => {
+                const tr = document.createElement('tr');
+                const bcDisabled = !bcAllowed.includes(f);
+                tr.innerHTML = `
+                    <td><strong>${f}</strong></td>
+                    <td><input type="text" data-f="${f}" data-t="${side}AC" class="in"></td>
+                    <td><input type="text" data-f="${f}" data-t="${side}BC" class="in" ${bcDisabled ? 'disabled' : ''}></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
     }
 
-    const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
+    initGrids();
+    document.querySelectorAll('.in').forEach(i => i.addEventListener('input', drawAll));
 
-    // 1. Draw AC Lines
-    ['RAC', 'LAC'].forEach(type => {
-        const color = type.startsWith('R') ? 'red' : 'blue';
-        const points = allInputs
-            .filter(i => i.dataset.t === type && !i.value.toLowerCase().includes('n'))
-            .map(i => ({...getCoords(type, i.dataset.f, i.value), f: parseInt(i.dataset.f)}))
-            .sort((a, b) => a.f - b.f);
+    function getCoords(type, freq, val) {
+        const fIdx = freqs.indexOf(parseInt(freq));
+        const isLeft = type.startsWith('L');
+        const startX = isLeft ? CAL.L_X_START : CAL.R_X_START;
+        return {
+            x: startX + (fIdx * CAL.X_STEP),
+            y: CAL.Y_ZERO + (parseFloat(val) * (CAL.Y_STEP_10 / 10))
+        };
+    }
 
-        if (points.length > 1) {
-            ctx.beginPath();
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3; // Thicker lines for professional look
-            ctx.moveTo(points[0].x, points[0].y);
-            points.forEach(p => ctx.lineTo(p.x, p.y));
-            ctx.stroke();
+    function drawAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (bgImage.complete) ctx.drawImage(bgImage, 0, 0);
+
+        const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
+
+        // 1. Draw AC Connecting Lines (Skip NR)
+        ['RAC', 'LAC'].forEach(type => {
+            const color = type.startsWith('R') ? 'red' : 'blue';
+            const points = allInputs
+                .filter(i => i.dataset.t === type && !i.value.toLowerCase().includes('n'))
+                .map(i => ({...getCoords(type, i.dataset.f, i.value), f: parseInt(i.dataset.f)}))
+                .sort((a, b) => a.f - b.f);
+
+            if (points.length > 1) {
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 3;
+                ctx.moveTo(points[0].x, points[0].y);
+                points.forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+            }
+        });
+
+        // 2. Render Symbols
+        allInputs.forEach(i => {
+            const val = i.value.toLowerCase();
+            const db = parseFloat(val);
+            if (isNaN(db)) return;
+            const pos = getCoords(i.dataset.t, i.dataset.f, val);
+            renderSymbol(i.dataset.t, pos, val);
+        });
+    }
+
+    function renderSymbol(type, pos, val) {
+        const {x, y} = pos;
+        const isM = val.includes('m'), isN = val.includes('n');
+        ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
+        ctx.lineWidth = 3; 
+        ctx.beginPath();
+
+        if (type === 'RAC') {
+            isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath()) : ctx.arc(x,y,8,0,Math.PI*2);
+        } else if (type === 'LAC') {
+            isM ? ctx.rect(x-8,y-8,16,16) : (ctx.moveTo(x-8,y-8), ctx.lineTo(x+8,y+8), ctx.moveTo(x+8,y-8), ctx.lineTo(x-8,y+8));
+        } else if (type === 'RBC') {
+            isM ? (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x+9,y+9)) : (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y), ctx.lineTo(x+9,y+9));
+        } else if (type === 'LBC') {
+            isM ? (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x-9,y+9)) : (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y), ctx.lineTo(x-9,y+9));
         }
-    });
+        ctx.stroke();
 
-    // 2. Draw Symbols
-    allInputs.forEach(i => {
-        const val = i.value.toLowerCase();
-        const db = parseFloat(val);
-        if (isNaN(db)) return;
-        const pos = getCoords(i.dataset.t, i.dataset.f, val);
-        renderSymbol(i.dataset.t, pos, val);
-    });
-}
+        if (isN) drawNR(x, y, type.startsWith('R'));
+    }
 
-function getCoords(type, freq, val) {
-    const fIdx = freqs.indexOf(parseInt(freq));
-    const isLeft = type.startsWith('L');
-    const startX = isLeft ? CAL.L_X_START : CAL.R_X_START;
-    return {
-        x: startX + (fIdx * CAL.X_STEP),
-        y: CAL.Y_ZERO + (parseFloat(val) * (CAL.Y_STEP_10 / 10))
-    };
-}
+    function drawNR(x, y, isRight) {
+        const angle = isRight ? (45 * Math.PI / 180) : (135 * Math.PI / 180);
+        const len = 25;
+        const endX = x + Math.cos(angle) * len;
+        const endY = y + Math.sin(angle) * len;
 
-// ... Keep your existing renderSymbol and drawNR functions below ...
-    
+        ctx.beginPath(); ctx.lineWidth = 2.5;
+        ctx.moveTo(x, y); ctx.lineTo(endX, endY);
+        
+        const h = 8;
+        ctx.lineTo(endX - h * Math.cos(angle - Math.PI/6), endY - h * Math.sin(angle - Math.PI/6));
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - h * Math.cos(angle + Math.PI/6), endY - h * Math.sin(angle + Math.PI/6));
+        ctx.stroke();
+    }
+
+    function downloadImage() {
+        const link = document.createElement('a');
+        link.download = `Audiogram_${new Date().toLocaleDateString()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+</script>
 </body>
-    </html>
-    
+</html>
