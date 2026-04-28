@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator - Smart Path Break</title>
+    <title>Audiogram Creator - Smart Join Logic</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -123,7 +123,7 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
-        // AC Drawing with path-breaking logic
+        // AC Drawing Logic
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
             ctx.beginPath();
@@ -131,31 +131,33 @@
             ctx.lineWidth = 3;
             ctx.lineJoin = "round";
 
-            let isDrawing = false;
+            let isFirstPoint = true;
 
-            freqs.forEach(f => {
-                const input = allInputs.find(i => i.dataset.t === type && parseInt(i.dataset.f) === f);
+            // Loop through frequencies to decide when to draw or break
+            freqs.forEach((f, index) => {
+                const currentInput = allInputs.find(i => i.dataset.t === type && parseInt(i.dataset.f) === f);
                 
-                if (input) {
-                    const val = input.value.toLowerCase();
-                    const hasNR = val.includes('n');
+                if (currentInput) {
+                    const val = currentInput.value.toLowerCase();
                     const coords = getCoords(type, f, val);
 
-                    if (hasNR) {
-                        // Stop joining line at NR
-                        isDrawing = false;
+                    if (val.includes('n')) {
+                        // NO RESPONSE encountered: finalize current path segment and reset
+                        ctx.stroke();
+                        ctx.beginPath();
+                        isFirstPoint = true;
                     } else {
-                        if (!isDrawing) {
+                        // VALID THRESHOLD: continue path
+                        if (isFirstPoint) {
                             ctx.moveTo(coords.x, coords.y);
-                            isDrawing = true;
+                            isFirstPoint = false;
                         } else {
                             ctx.lineTo(coords.x, coords.y);
                         }
                     }
-                } else {
-                    // Break line if there's no data for this frequency
-                    isDrawing = false;
                 }
+                // Note: If no input for this frequency, we just skip it, 
+                // essentially bridging the gap between adjacent valid inputs.
             });
             ctx.stroke();
         });
