@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator - Custom NR Lengths</title>
+    <title>Audiogram Creator - Smart Path Break</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -123,21 +123,44 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
+        // AC Drawing with path-breaking logic
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
-            const points = allInputs
-                .filter(i => i.dataset.t === type && !i.value.toLowerCase().includes('n'))
-                .map(i => ({...getCoords(type, i.dataset.f, i.value), f: parseInt(i.dataset.f)}))
-                .sort((a, b) => a.f - b.f);
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.lineJoin = "round";
 
-            if (points.length > 1) {
-                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = "round";
-                ctx.moveTo(points[0].x, points[0].y);
-                points.forEach(p => ctx.lineTo(p.x, p.y));
-                ctx.stroke();
-            }
+            let isDrawing = false;
+
+            freqs.forEach(f => {
+                const input = allInputs.find(i => i.dataset.t === type && parseInt(i.dataset.f) === f);
+                
+                if (input) {
+                    const val = input.value.toLowerCase();
+                    const hasNR = val.includes('n');
+                    const coords = getCoords(type, f, val);
+
+                    if (hasNR) {
+                        // Stop joining line at NR
+                        isDrawing = false;
+                    } else {
+                        if (!isDrawing) {
+                            ctx.moveTo(coords.x, coords.y);
+                            isDrawing = true;
+                        } else {
+                            ctx.lineTo(coords.x, coords.y);
+                        }
+                    }
+                } else {
+                    // Break line if there's no data for this frequency
+                    isDrawing = false;
+                }
+            });
+            ctx.stroke();
         });
 
+        // Draw Symbols
         allInputs.forEach(i => {
             const val = i.value.toLowerCase();
             const db = parseFloat(val);
@@ -171,8 +194,7 @@
 
     function drawArrow(x, y, type, isMasked) {
         let angle;
-        let startOffsetX = 0;
-        let startOffsetY = 0;
+        let startOffsetX = 0, startOffsetY = 0;
         let arrowLen = 25; 
 
         if (type === 'RAC') angle = 45;
@@ -183,17 +205,13 @@
         const rads = angle * Math.PI / 180;
 
         if (type.endsWith('BC')) {
-            // BC Logic: Shortened arrow shaft starting from bracket tips
             arrowLen = 12.5; 
             startOffsetY = 9; 
             startOffsetX = (type === 'RBC') ? 9 : -9;
         } else if (type.endsWith('AC')) {
-            // Special Rule: Left unmasked AC starts at center (no offset)
             if (type === 'LAC' && !isMasked) {
-                startOffsetX = 0;
-                startOffsetY = 0;
+                startOffsetX = 0; startOffsetY = 0;
             } else {
-                // Right AC (masked/unmasked) and Left AC (masked) push out
                 const pushOut = isMasked ? 11 : 10;
                 startOffsetX = Math.cos(rads) * pushOut;
                 startOffsetY = Math.sin(rads) * pushOut;
@@ -201,16 +219,13 @@
             }
         }
 
-        const startX = x + startOffsetX;
-        const startY = y + startOffsetY;
-        const endX = startX + Math.cos(rads) * arrowLen;
-        const endY = startY + Math.sin(rads) * arrowLen;
+        const startX = x + startOffsetX, startY = y + startOffsetY;
+        const endX = startX + Math.cos(rads) * arrowLen, endY = startY + Math.sin(rads) * arrowLen;
 
         ctx.beginPath();
         ctx.lineWidth = 2.5;
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
-        
         const h = 8; 
         ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
         ctx.moveTo(endX, endY);
