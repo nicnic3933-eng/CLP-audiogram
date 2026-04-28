@@ -16,5 +16,183 @@
         th { background: #f8f9fa; font-size: 0.8rem; font-weight: 600; }
         input { width: 55px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         input:focus { border-color: #007bff; outline: none; background: #f0f7ff; }
-        input:disabled { background: #
-                        
+        input:disabled { background: #f1f1f1; cursor: not-allowed; border-color: #eee; }
+        .canvas-container { position: relative; border: 2px solid #333; line-height: 0; }
+        canvas { background: #fff; max-width: 100%; height: auto; }
+        .toolbar { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
+        button { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-save { background: #28a745; color: white; }
+        .btn-reset { background: #6c757d; color: white; }
+        button:hover { opacity: 0.9; }
+        .instructions { font-size: 0.85rem; color: #555; margin-top: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="input-wrapper">
+        <div>
+            <h3 class="red-text">RIGHT EAR (O / &lt;)</h3>
+            <table id="rightGrid">
+                <thead><tr><th>Hz</th><th>AC</th><th>BC</th></tr></thead>
+                <tbody id="rightBody"></tbody>
+            </table>
+        </div>
+
+        <div>
+            <h3 class="blue-text">LEFT EAR (X / &gt;)</h3>
+            <table id="leftGrid">
+                <thead><tr><th>Hz</th><th>AC</th><th>BC</th></tr></thead>
+                <tbody id="leftBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="audioCanvas" width="1024" height="600"></canvas>
+    </div>
+
+    <div class="instructions">
+        <strong>Shortcut Rules:</strong> Type <b>"m"</b> for Masked (e.g., 20m) • Type <b>"n"</b> for No Response (e.g., 40n) • Type <b>"mn"</b> for Masked NR.
+    </div>
+
+    <div class="toolbar">
+        <button class="btn-save" onclick="downloadImage()">Download PNG Report</button>
+        <button class="btn-reset" onclick="location.reload()">Clear All Data</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('audioCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // CONFIGURATION
+    const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
+    const bcAllowed = [500, 1000, 2000, 4000];
+
+    // CALIBRATION (Adjust these to align symbols with your template lines)
+    const CAL = {
+        R_X_START: 132,   // X-pixel for Right 250Hz
+        L_X_START: 635,   // X-pixel for Left 250Hz
+        X_STEP: 53.5,     // Pixels between freq lines
+        Y_ZERO: 72,       // Y-pixel for 0 dB
+        Y_STEP_10: 38.5   // Y-pixels for every 10 dB
+    };
+
+    const bgImage = new Image();
+    bgImage.src = 'template.png'; // Ensure this file is in the same folder
+    bgImage.onload = () => drawAll();
+
+    // Create Table Rows for Vertical Tab Flow within each ear
+    function initGrids() {
+        const bodies = { 'R': 'rightBody', 'L': 'leftBody' };
+        for (let side in bodies) {
+            const tbody = document.getElementById(bodies[side]);
+            freqs.forEach(f => {
+                const tr = document.createElement('tr');
+                const bcDisabled = !bcAllowed.includes(f);
+                tr.innerHTML = `
+                    <td><strong>${f}</strong></td>
+                    <td><input type="text" data-f="${f}" data-t="${side}AC" class="in"></td>
+                    <td><input type="text" data-f="${f}" data-t="${side}BC" class="in" ${bcDisabled ? 'disabled' : ''}></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    }
+
+    initGrids();
+    document.querySelectorAll('.in').forEach(i => i.addEventListener('input', drawAll));
+
+    function getCoords(type, freq, val) {
+        const fIdx = freqs.indexOf(parseInt(freq));
+        const db = parseFloat(val);
+        const isLeft = type.startsWith('L');
+        const startX = isLeft ? CAL.L_X_START : CAL.R_X_START;
+        return {
+            x: startX + (fIdx * CAL.X_STEP),
+            y: CAL.Y_ZERO + (db * (CAL.Y_STEP_10 / 10))
+        };
+    }
+
+    function drawAll() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (bgImage.complete) ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+
+        const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
+
+        // 1. Draw AC Connecting Lines (Sorted by Freq, skip NR)
+        ['RAC', 'LAC'].forEach(type => {
+            const color = type.startsWith('R') ? 'red' : 'blue';
+            const points = allInputs
+                .filter(i => i.dataset.t === type && !i.value.toLowerCase().includes('n'))
+                .map(i => ({...getCoords(type, i.dataset.f, i.value), f: parseInt(i.dataset.f)}))
+                .sort((a, b) => a.f - b.f);
+
+            if (points.length > 1) {
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+                ctx.moveTo(points[0].x, points[0].y);
+                points.forEach(p => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+            }
+        });
+
+        // 2. Render Individual Symbols
+        allInputs.forEach(i => {
+            const val = i.value.toLowerCase();
+            const db = parseFloat(val);
+            if (isNaN(db)) return;
+            const pos = getCoords(i.dataset.t, i.dataset.f, val);
+            renderSymbol(i.dataset.t, pos, val);
+        });
+    }
+
+    function renderSymbol(type, pos, val) {
+        const {x, y} = pos;
+        const isM = val.includes('m'), isN = val.includes('n');
+        ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
+        ctx.lineWidth = 3; 
+        ctx.beginPath();
+
+        if (type === 'RAC') {
+            isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath()) : ctx.arc(x,y,8,0,Math.PI*2);
+        } else if (type === 'LAC') {
+            isM ? ctx.rect(x-8,y-8,16,16) : (ctx.moveTo(x-8,y-8), ctx.lineTo(x+8,y+8), ctx.moveTo(x+8,y-8), ctx.lineTo(x-8,y+8));
+        } else if (type === 'RBC') {
+            isM ? (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x+9,y+9)) : (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y), ctx.lineTo(x+9,y+9));
+        } else if (type === 'LBC') {
+            isM ? (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x-9,y+9)) : (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y), ctx.lineTo(x-9,y+9));
+        }
+        ctx.stroke();
+
+        if (isN) drawNR(x, y, type.startsWith('R'));
+    }
+
+    function drawNR(x, y, isRight) {
+        // NR arrow points down-out (45 deg for Right ear, 135 deg for Left)
+        const angle = isRight ? (45 * Math.PI / 180) : (135 * Math.PI / 180);
+        const len = 25;
+        const endX = x + Math.cos(angle) * len;
+        const endY = y + Math.sin(angle) * len;
+
+        ctx.beginPath(); ctx.lineWidth = 2;
+        ctx.moveTo(x, y); ctx.lineTo(endX, endY);
+        
+        // Arrowhead
+        const h = 8;
+        ctx.lineTo(endX - h * Math.cos(angle - Math.PI/6), endY - h * Math.sin(angle - Math.PI/6));
+        ctx.moveTo(endX, endY);
+        ctx.lineTo(endX - h * Math.cos(angle + Math.PI/6), endY - h * Math.sin(angle + Math.PI/6));
+        ctx.stroke();
+    }
+
+    function downloadImage() {
+        const link = document.createElement('a');
+        link.download = `Audiogram_${new Date().getTime()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }
+</script>
+</body>
+    </html>
+    
