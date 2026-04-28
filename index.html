@@ -6,14 +6,16 @@
     <title>CLP Audiogram Generator</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .app-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; max-width: 900px; }
+        
+        /* Container width adjusted for better layout */
+        .app-container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: 95%; max-width: 1000px; box-sizing: border-box; }
         
         h1 { margin-top: 0; color: #333; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 10px; }
         
-        .intro-section { background: #eef2f7; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; color: #444; line-height: 1.5; }
+        .intro-section { background: #eef2f7; padding: 15px 20px; border-radius: 8px; margin-bottom: 25px; color: #444; line-height: 1.5; font-size: 0.95rem; }
         .intro-section p { margin: 8px 0; }
 
-        .input-wrapper { display: flex; gap: 30px; margin-bottom: 25px; justify-content: center; }
+        .input-wrapper { display: flex; gap: 20px; margin-bottom: 25px; justify-content: center; flex-wrap: wrap; }
         h3 { margin: 0 0 10px 0; font-size: 1.1rem; text-align: center; }
         .red-text { color: #d32f2f; }
         .blue-text { color: #1976d2; }
@@ -22,16 +24,31 @@
         th, td { border: 1px solid #dee2e6; padding: 4px 8px; text-align: center; }
         th { background: #f8f9fa; font-size: 0.8rem; font-weight: 600; }
         
-        input { width: 55px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
+        input { width: 50px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         input:focus { border-color: #007bff; outline: none; background: #f0f7ff; }
-        input:disabled { background: #f1f1f1; cursor: not-allowed; border-color: #eee; }
         
-        .canvas-container { position: relative; border: 2px solid #333; line-height: 0; overflow: auto; margin-top: 10px; }
-        canvas { background: #fff; display: block; }
+        /* FIX: Ensure canvas doesn't exceed screen width */
+        .canvas-container { 
+            position: relative; 
+            border: 2px solid #333; 
+            line-height: 0; 
+            margin-top: 10px; 
+            width: 100%; 
+            display: flex;
+            justify-content: center;
+            background: #ddd;
+            overflow: hidden; /* Prevent container scrollbars */
+        }
+        
+        canvas { 
+            background: #fff; 
+            display: block; 
+            max-width: 100%; /* Shrink to fit container */
+            height: auto;    /* Keep aspect ratio */
+        }
         
         .toolbar { margin-top: 20px; display: flex; gap: 15px; justify-content: center; }
-        button { padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
-        button:hover { opacity: 0.9; }
+        button { padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
         .btn-save { background: #28a745; color: white; }
         .btn-reset { background: #6c757d; color: white; }
     </style>
@@ -42,7 +59,7 @@
     <h1>CLP Audiogram Generator</h1>
 
     <div class="intro-section">
-        <p>Input the thresholds below to generate the audiogram. Add suffices to make it masked or no response. e.g. 5m = 5 dB masked, 105n = NR at 105 dB, 80mn = NR at 80 dB masked.</p>
+        <p>Input the thresholds below to generate the audiogram. </p><p>Add suffices to make it masked or no response. e.g. 5m = 5 dB masked, 105n = NR at 105 dB, 80mn = NR at 80 dB masked.</p>
         <p>Copy the output diagram and set the height of the pasted diagram to be <strong>7.7 cm</strong>.</p>
     </div>
 
@@ -136,14 +153,11 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
-        // AC Drawing Logic
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
             ctx.strokeStyle = color;
             ctx.lineWidth = 3;
-
             let currentPath = [];
-
             freqs.forEach(f => {
                 const input = allInputs.find(i => i.dataset.t === type && parseInt(i.dataset.f) === f);
                 if (input) {
@@ -159,7 +173,6 @@
             drawSegmentedPath(currentPath);
         });
 
-        // Draw Symbols
         allInputs.forEach(i => {
             const val = i.value.toLowerCase();
             const db = parseFloat(val);
@@ -168,29 +181,17 @@
         });
     }
 
-    // GAP LOGIC: Shortens line segments to avoid touching symbols
     function drawSegmentedPath(points) {
         if (points.length < 2) return;
-        const gap = 11; // Increased to 11px (Radius + 3px)
-
+        const gap = 11; 
         for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i];
-            const p2 = points[i+1];
-
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
+            const p1 = points[i], p2 = points[i+1];
+            const dx = p2.x - p1.x, dy = p2.y - p1.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-
             if (dist > gap * 2) {
-                const startX = p1.x + (dx / dist) * gap;
-                const startY = p1.y + (dy / dist) * gap;
-                const endX = p2.x - (dx / dist) * gap;
-                const endY = p2.y - (dy / dist) * gap;
-
-                ctx.beginPath();
-                ctx.moveTo(startX, startY);
-                ctx.lineTo(endX, endY);
-                ctx.stroke();
+                const startX = p1.x + (dx / dist) * gap, startY = p1.y + (dy / dist) * gap;
+                const endX = p2.x - (dx / dist) * gap, endY = p2.y - (dy / dist) * gap;
+                ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(endX, endY); ctx.stroke();
             }
         }
     }
@@ -201,7 +202,6 @@
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
         ctx.beginPath();
-
         if (type === 'RAC') {
             isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath()) : ctx.arc(x,y,8,0,Math.PI*2);
         } else if (type === 'LAC') {
@@ -212,48 +212,32 @@
             isM ? (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x-9,y+9)) : (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y), ctx.lineTo(x-9,y+9));
         }
         ctx.stroke();
-
         if (isN) drawArrow(x, y, type, isM);
     }
 
     function drawArrow(x, y, type, isMasked) {
         let angle;
-        let startOffsetX = 0, startOffsetY = 0;
-        let arrowLen = 25; 
-
+        let startOffsetX = 0, startOffsetY = 0, arrowLen = 25; 
         if (type === 'RAC') angle = 45;
         else if (type === 'LAC') angle = 90;
         else if (type === 'RBC') angle = 135;
         else if (type === 'LBC') angle = 45;
-
         const rads = angle * Math.PI / 180;
-
         if (type.endsWith('BC')) {
-            arrowLen = 12.5; 
-            startOffsetY = 9; 
-            startOffsetX = (type === 'RBC') ? 9 : -9;
+            arrowLen = 12.5; startOffsetY = 9; startOffsetX = (type === 'RBC') ? 9 : -9;
         } else if (type.endsWith('AC')) {
-            if (type === 'LAC' && !isMasked) {
-                startOffsetX = 0; startOffsetY = 0;
-            } else {
+            if (type === 'LAC' && !isMasked) { startOffsetX = 0; startOffsetY = 0; }
+            else {
                 const pushOut = isMasked ? 11 : 10;
-                startOffsetX = Math.cos(rads) * pushOut;
-                startOffsetY = Math.sin(rads) * pushOut;
+                startOffsetX = Math.cos(rads) * pushOut; startOffsetY = Math.sin(rads) * pushOut;
                 arrowLen -= pushOut; 
             }
         }
-
         const startX = x + startOffsetX, startY = y + startOffsetY;
         const endX = startX + Math.cos(rads) * arrowLen, endY = startY + Math.sin(rads) * arrowLen;
-
-        ctx.beginPath();
-        ctx.lineWidth = 2.5;
-        ctx.moveTo(startX, startY);
-        ctx.lineTo(endX, endY);
-        const h = 8; 
-        ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
-        ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - h * Math.cos(rads + Math.PI/6), endY - h * Math.sin(rads + Math.PI/6));
+        ctx.beginPath(); ctx.lineWidth = 2.5; ctx.moveTo(startX, startY); ctx.lineTo(endX, endY);
+        const h = 8; ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
+        ctx.moveTo(endX, endY); ctx.lineTo(endX - h * Math.cos(rads + Math.PI/6), endY - h * Math.sin(rads + Math.PI/6));
         ctx.stroke();
     }
 
