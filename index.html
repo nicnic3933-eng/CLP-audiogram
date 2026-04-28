@@ -2,151 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Audiogram Workflow Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Audiogram Plotter</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .app-container { display: flex; flex-direction: column; gap: 20px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: fit-content; }
-        .input-sections { display: flex; gap: 40px; margin-bottom: 20px; }
-        h3 { margin-top: 0; color: #333; font-size: 1rem; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
+        .input-wrapper { display: flex; gap: 30px; margin-bottom: 20px; }
+        h3 { margin: 0 0 10px 0; font-size: 1.1rem; text-align: center; }
+        .red-text { color: #d32f2f; }
+        .blue-text { color: #1976d2; }
         table { border-collapse: collapse; background: #fff; }
-        th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
-        th { background: #fafafa; font-size: 0.8rem; }
-        input { width: 45px; padding: 5px; text-align: center; border: 1px solid #ccc; border-radius: 4px; }
-        input:disabled { background: #f9f9f9; border-color: #eee; cursor: not-allowed; }
-        canvas { border: 1px solid #333; background: #fff; }
-        .red { color: #d32f2f; } .blue { color: #1976d2; }
-    </style>
-</head>
-<body>
-
-<div class="app-container">
-    <div class="input-sections">
-        <div>
-            <h3 class="red">RIGHT EAR</h3>
-            <table id="rightGrid">
-                <thead><tr><th>Hz</th><th>AC</th><th>BC</th></tr></thead>
-                <tbody id="rightBody"></tbody>
-            </table>
-        </div>
-
-        <div>
-            <h3 class="blue">LEFT EAR</h3>
-            <table id="leftGrid">
-                <thead><tr><th>Hz</th><th>AC</th><th>BC</th></tr></thead>
-                <tbody id="leftBody"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <canvas id="audioCanvas" width="1024" height="500"></canvas>
-    
-    <div style="margin-top: 10px;">
-        <button onclick="download()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer;">Download Audiogram</button>
-    </div>
-</div>
-
-<script>
-    const canvas = document.getElementById('audioCanvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Updated frequency list
-    const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
-    const bcAllowed = [500, 1000, 2000, 4000];
-
-    const CAL = {
-        R_X_START: 85, L_X_START: 575, X_STEP: 52, Y_ZERO: 65, Y_STEP_10: 36
-    };
-
-    const bgImage = new Image();
-    bgImage.src = 'template.png'; 
-    bgImage.onload = () => drawAll();
-
-    // Generate Horizontal Rows for both ears
-    function createRows(bodyId, typePrefix) {
-        const tbody = document.getElementById(bodyId);
-        freqs.forEach(f => {
-            const isBCDisabled = !bcAllowed.includes(f);
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td><strong>${f}</strong></td>
-                <td><input type="text" data-f="${f}" data-t="${typePrefix}AC" class="in"></td>
-                <td><input type="text" data-f="${f}" data-t="${typePrefix}BC" class="in" ${isBCDisabled ? 'disabled' : ''}></td>
-            `;
-            tbody.appendChild(tr);
-        });
-    }
-
-    createRows('rightBody', 'R');
-    createRows('leftBody', 'L');
-
-    document.querySelectorAll('.in').forEach(i => i.addEventListener('input', drawAll));
-
-    function getPos(type, freq, val) {
-        const fIdx = freqs.indexOf(parseInt(freq));
-        const db = parseFloat(val);
-        const isLeft = type.startsWith('L');
-        return {
-            x: (isLeft ? CAL.L_X_START : CAL.R_X_START) + (fIdx * CAL.X_STEP),
-            y: CAL.Y_ZERO + (db * (CAL.Y_STEP_10 / 10))
-        };
-    }
-
-    function drawAll() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (bgImage.complete) ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-
-        const inputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
-        
-        ['RAC', 'LAC'].forEach(type => {
-            const color = type.startsWith('R') ? 'red' : 'blue';
-            const points = inputs
-                .filter(i => i.dataset.t === type && !i.value.toLowerCase().includes('n'))
-                .map(i => ({...getPos(type, i.dataset.f, i.value), f: parseInt(i.dataset.f)}))
-                .sort((a,b) => a.f - b.f);
-
-            if (points.length > 1) {
-                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
-                ctx.moveTo(points[0].x, points[0].y);
-                points.forEach(p => ctx.lineTo(p.x, p.y));
-                ctx.stroke();
-            }
-        });
-
-        inputs.forEach(i => {
-            const val = i.value.toLowerCase();
-            const pos = getPos(i.dataset.t, i.dataset.f, val);
-            renderSymbol(i.dataset.t, pos, val);
-        });
-    }
-
-    function renderSymbol(type, pos, val) {
-        const {x, y} = pos;
-        const isM = val.includes('m'), isN = val.includes('n');
-        ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
-        ctx.lineWidth = 2; ctx.beginPath();
-
-        if (type === 'RAC') {
-            isM ? (ctx.moveTo(x,y-7), ctx.lineTo(x-7,y+5), ctx.lineTo(x+7,y+5), ctx.closePath()) : ctx.arc(x,y,6,0,7);
-        } else if (type === 'LAC') {
-            isM ? ctx.rect(x-6,y-6,12,12) : (ctx.moveTo(x-6,y-6), ctx.lineTo(x+6,y+6), ctx.moveTo(x+6,y-6), ctx.lineTo(x-6,y+6));
-        } else if (type === 'RBC') {
-            isM ? (ctx.moveTo(x+7,y-7), ctx.lineTo(x,y-7), ctx.lineTo(x,y+7), ctx.lineTo(x+7,y+7)) : (ctx.moveTo(x+7,y-7), ctx.lineTo(x,y), ctx.lineTo(x+7,y+7));
-        } else if (type === 'LBC') {
-            isM ? (ctx.moveTo(x-7,y-7), ctx.lineTo(x,y-7), ctx.lineTo(x,y+7), ctx.lineTo(x-7,y+7)) : (ctx.moveTo(x-7,y-7), ctx.lineTo(x,y), ctx.lineTo(x-7,y+7));
-        }
-        ctx.stroke();
-        if (isN) {
-            const angle = type.startsWith('R') ? 0.7 : 2.4;
-            ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x + Math.cos(angle)*18, y + Math.sin(angle)*18); ctx.stroke();
-        }
-    }
-
-    function download() {
-        const link = document.createElement('a');
-        link.download = 'audiogram.png';
-        link.href = canvas.toDataURL();
-        link.click();
-    }
-</script>
-</body>
-</html>
+        th, td { border: 1px solid #dee2e6; padding: 4px 8px; text-align: center; }
+        th { background: #f8f9fa; font-size: 0.8rem; font-weight: 600; }
+        input { width: 55px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
+        input:focus { border-color: #007bff; outline: none; background: #f0f7ff; }
+        input:disabled { background: #
+                        
