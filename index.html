@@ -154,7 +154,7 @@
 
     function drawSegmentedPath(points) {
         if (points.length < 2) return;
-        const gap = 16; // Now Radius + 8px
+        const gap = 16; 
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i], p2 = points[i+1];
             const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -173,7 +173,7 @@
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
 
-        // BC Displacement: R goes left (-3), L goes right (+3)
+        // BC Displacement: R moves 3px Left, L moves 3px Right
         if (type.endsWith('BC')) {
             x += (type.startsWith('R') ? -3 : 3);
         }
