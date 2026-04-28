@@ -28,7 +28,7 @@
         .btn-save { background: #28a745; color: white; }
         .btn-reset { background: #6c757d; color: white; }
         
-        /* Summary Table Styling - Word Optimized */
+        /* Summary Table Styling - Center Aligned & Word Optimized */
         .summary-container { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; width: 100%; display: flex; justify-content: center; }
         .summary-table { 
             max-width: 800px; 
@@ -37,6 +37,7 @@
             font-size: 14.7px; /* 11pt equivalent */
             border-collapse: collapse;
             color: #000;
+            text-align: center; /* Aligns table content to center */
         }
         .summary-table th, .summary-table td { 
             border: 1px solid #000; 
@@ -44,9 +45,11 @@
             color: #000; 
             font-weight: normal;
             background-color: transparent !important;
+            text-align: center; /* Explicitly center every cell */
+            vertical-align: middle;
         }
-        .avg-label { font-weight: bold !important; }
-        .avg-val { color: #d32f2f !important; font-weight: normal !important; }
+        .avg-label { font-weight: bold !important; text-align: center; }
+        .avg-val { color: #d32f2f !important; font-weight: normal !important; text-align: center; }
     </style>
 </head>
 <body>
@@ -276,9 +279,7 @@
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
         
-        // Horizontal offset logic for BC symbols
         if (type.endsWith('BC')) {
-            // Updated: 9px (base) + 4px (requested) = 13px total offset
             x += (type.startsWith('R') ? -13 : 13);
         }
 
@@ -305,8 +306,6 @@
         if (type.endsWith('BC')) { 
             arrowLen = 12.5; 
             startOffsetY = 9; 
-            // Arrows start from the bottom tip of the bracket, 
-            // so we add the offset to make them connect perfectly.
             startOffsetX = (type === 'RBC') ? 9 : -9;
         }
         else if (type.endsWith('AC')) {
