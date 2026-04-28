@@ -16,8 +16,8 @@
         .blue-text { color: #1976d2; }
         
         /* Grid Tables */
-        table { border-collapse: collapse; background: #fff; width: 100%; max-width: 450px; }
-        th, td { border: 1px solid #dee2e6; padding: 6px 8px; text-align: center; }
+        .grid-table { border-collapse: collapse; background: #fff; width: 100%; max-width: 450px; }
+        .grid-table th, .grid-table td { border: 1px solid #dee2e6; padding: 6px 8px; text-align: center; }
         .grid-th { background: #f8f9fa; font-weight: 600; font-size: 0.9rem; }
         input { width: 50px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         
@@ -28,32 +28,25 @@
         .btn-save { background: #28a745; color: white; }
         .btn-reset { background: #6c757d; color: white; }
         
-        /* Summary Table Styling */
+        /* Summary Table Styling - Word Optimized */
         .summary-container { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; width: 100%; display: flex; justify-content: center; }
-       .summary-table { 
-        max-width: 800px; 
-        border: 1px solid #000; 
-        /* 14.7px is the standard CSS equivalent for Word's 11pt font */
-        font-family: Arial, Helvetica, sans-serif; 
-        font-size: 14.7px; 
-        border-collapse: collapse;
-        color: #000;
-    }
-    
-    .summary-table th, .summary-table td { 
-        border: 1px solid #000; 
-        padding: 5px; 
-        color: #000; 
-        font-weight: normal;
-        background-color: transparent !important;
-        /* Helps Word recognize the font size */
-        mso-number-format: "\@"; 
-        line-height: 1.2;
-    }
-
-    .summary-table .avg-val { 
-        color: #ff0000 !important; 
-    }
+        .summary-table { 
+            max-width: 800px; 
+            border: 1px solid #000; 
+            font-family: Arial, Helvetica, sans-serif; 
+            font-size: 14.7px; /* 11pt equivalent */
+            border-collapse: collapse;
+            color: #000;
+        }
+        .summary-table th, .summary-table td { 
+            border: 1px solid #000; 
+            padding: 5px; 
+            color: #000; 
+            font-weight: normal;
+            background-color: transparent !important;
+        }
+        .avg-label { font-weight: bold !important; }
+        .avg-val { color: #d32f2f !important; font-weight: normal !important; }
     </style>
 </head>
 <body>
@@ -69,14 +62,14 @@
     <div class="input-wrapper">
         <div>
             <h3 class="red-text">RIGHT EAR</h3>
-            <table>
+            <table class="grid-table">
                 <thead><tr><th class="grid-th">Hz</th><th class="grid-th">AC</th><th class="grid-th">BC</th></tr></thead>
                 <tbody id="rightBody"></tbody>
             </table>
         </div>
         <div>
             <h3 class="blue-text">LEFT EAR</h3>
-            <table>
+            <table class="grid-table">
                 <thead><tr><th class="grid-th">Hz</th><th class="grid-th">AC</th><th class="grid-th">BC</th></tr></thead>
                 <tbody id="leftBody"></tbody>
             </table>
@@ -112,17 +105,17 @@
             <tbody id="summaryBody"></tbody>
             <tfoot>
                 <tr>
-                    <td>Average 500, 1k, 2k</td>
+                    <td class="avg-label">Average 500, 1k, 2k</td>
                     <td colspan="3" id="avg-r-1" class="avg-val">-</td>
                     <td colspan="3" id="avg-l-1" class="avg-val">-</td>
                 </tr>
                 <tr>
-                    <td>Average 1k, 2k, 3k</td>
+                    <td class="avg-label">Average 1k, 2k, 3k</td>
                     <td colspan="3" id="avg-r-2" class="avg-val">-</td>
                     <td colspan="3" id="avg-l-2" class="avg-val">-</td>
                 </tr>
                 <tr>
-                    <td>Average 3k, 4k, 6k</td>
+                    <td class="avg-label">Average 3k, 4k, 6k</td>
                     <td colspan="3" id="avg-r-3" class="avg-val">-</td>
                     <td colspan="3" id="avg-l-3" class="avg-val">-</td>
                 </tr>
@@ -220,7 +213,8 @@
         const calcAvg = (ear, fs) => {
             let sum = 0, count = 0;
             fs.forEach(f => {
-                const val = parseFloat(document.querySelector(`input[data-f="${f}"][data-t="${ear}AC"]`).value);
+                const el = document.querySelector(`input[data-f="${f}"][data-t="${ear}AC"]`);
+                const val = el ? parseFloat(el.value) : NaN;
                 if (!isNaN(val)) { sum += val; count++; }
             });
             return count > 0 ? Math.round(sum / count) : '-';
@@ -281,7 +275,13 @@
         const isM = val.includes('m'), isN = val.includes('n');
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
-        if (type.endsWith('BC')) { x += (type.startsWith('R') ? -3 : 3); }
+        
+        // Horizontal offset logic for BC symbols
+        if (type.endsWith('BC')) {
+            // Updated: 9px (base) + 4px (requested) = 13px total offset
+            x += (type.startsWith('R') ? -13 : 13);
+        }
+
         ctx.beginPath();
         if (type === 'RAC') {
             isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath()) : ctx.arc(x,y,8,0,Math.PI*2);
@@ -301,11 +301,19 @@
         if (type === 'RAC') angle = 45; else if (type === 'LAC') angle = 90; else if (type === 'RBC') angle = 135; else if (type === 'LBC') angle = 45;
         const rads = angle * Math.PI / 180;
         let startOffsetX = 0, startOffsetY = 0, arrowLen = 25; 
-        if (type.endsWith('BC')) { arrowLen = 12.5; startOffsetY = 9; startOffsetX = (type === 'RBC') ? 9 : -9; }
+        
+        if (type.endsWith('BC')) { 
+            arrowLen = 12.5; 
+            startOffsetY = 9; 
+            // Arrows start from the bottom tip of the bracket, 
+            // so we add the offset to make them connect perfectly.
+            startOffsetX = (type === 'RBC') ? 9 : -9;
+        }
         else if (type.endsWith('AC')) {
             if (type === 'LAC' && !isMasked) { startOffsetX = 0; startOffsetY = 0; }
             else { const pushOut = isMasked ? 11 : 10; startOffsetX = Math.cos(rads) * pushOut; startOffsetY = Math.sin(rads) * pushOut; arrowLen -= pushOut; }
         }
+
         const startX = x + startOffsetX, startY = y + startOffsetY;
         const endX = startX + Math.cos(rads) * arrowLen, endY = startY + Math.sin(rads) * arrowLen;
         ctx.beginPath(); ctx.lineWidth = 2.5; ctx.moveTo(startX, startY); ctx.lineTo(endX, endY);
