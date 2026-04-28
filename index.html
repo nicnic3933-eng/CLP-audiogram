@@ -30,21 +30,30 @@
         
         /* Summary Table Styling */
         .summary-container { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; width: 100%; display: flex; justify-content: center; }
-        .summary-table { 
-            max-width: 800px; 
-            border: 1px solid #000; 
-            font-family: Arial, sans-serif; 
-            font-size: 11px; 
-            border-collapse: collapse;
-        }
-        .summary-table th, .summary-table td { 
-            border: 1px solid #000; 
-            padding: 4px; 
-            color: #000; 
-            font-weight: normal;
-            background-color: transparent !important;
-        }
-        .summary-table .avg-val { color: red !important; }
+       .summary-table { 
+        max-width: 800px; 
+        border: 1px solid #000; 
+        /* 14.7px is the standard CSS equivalent for Word's 11pt font */
+        font-family: Arial, Helvetica, sans-serif; 
+        font-size: 14.7px; 
+        border-collapse: collapse;
+        color: #000;
+    }
+    
+    .summary-table th, .summary-table td { 
+        border: 1px solid #000; 
+        padding: 5px; 
+        color: #000; 
+        font-weight: normal;
+        background-color: transparent !important;
+        /* Helps Word recognize the font size */
+        mso-number-format: "\@"; 
+        line-height: 1.2;
+    }
+
+    .summary-table .avg-val { 
+        color: #ff0000 !important; 
+    }
     </style>
 </head>
 <body>
