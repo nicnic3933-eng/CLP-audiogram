@@ -14,17 +14,24 @@
         h3 { margin: 0 0 10px 0; font-size: 1.1rem; text-align: center; }
         .red-text { color: #d32f2f; }
         .blue-text { color: #1976d2; }
-        table { border-collapse: collapse; background: #fff; }
-        th, td { border: 1px solid #dee2e6; padding: 4px 8px; text-align: center; }
-        th { background: #f8f9fa; font-size: 0.8rem; font-weight: 600; }
+        table { border-collapse: collapse; background: #fff; width: 100%; max-width: 450px; }
+        th, td { border: 1px solid #dee2e6; padding: 6px 8px; text-align: center; font-size: 0.9rem; }
+        th { background: #f8f9fa; font-weight: 600; }
         input { width: 50px; padding: 6px; text-align: center; border: 1px solid #ccc; border-radius: 4px; font-weight: bold; }
         input:focus { border-color: #007bff; outline: none; background: #f0f7ff; }
         .canvas-container { position: relative; border: 2px solid #333; line-height: 0; margin-top: 10px; width: 100%; display: flex; justify-content: center; background: #ddd; overflow: hidden; }
         canvas { background: #fff; display: block; max-width: 100%; height: auto; }
-        .toolbar { margin-top: 20px; display: flex; gap: 15px; justify-content: center; }
+        .toolbar { margin: 20px 0; display: flex; gap: 15px; justify-content: center; }
         button { padding: 12px 30px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: opacity 0.2s; }
         .btn-save { background: #28a745; color: white; }
         .btn-reset { background: #6c757d; color: white; }
+        
+        /* Summary Table Styling */
+        .summary-container { margin-top: 30px; border-top: 2px solid #eee; padding-top: 20px; width: 100%; display: flex; justify-content: center; }
+        .summary-table { max-width: 800px; border: 2px solid #444; }
+        .summary-table th { background: #333; color: white; }
+        .summary-table .freq-col { background: #f1f1f1; font-weight: bold; width: 100px; }
+        .avg-row { background: #fff9e6; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -62,6 +69,44 @@
         <button class="btn-save" onclick="downloadImage()">Download PNG Report</button>
         <button class="btn-reset" onclick="location.reload()">Clear All Data</button>
     </div>
+
+    <div class="summary-container">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th rowspan="2" class="freq-col">Frequency (Hz)</th>
+                    <th colspan="3" class="red-text">Right Ear</th>
+                    <th colspan="3" class="blue-text">Left Ear</th>
+                </tr>
+                <tr>
+                    <th style="font-size: 0.75rem;">dBHL (AC)</th>
+                    <th style="font-size: 0.75rem;">UM B/C</th>
+                    <th style="font-size: 0.75rem;">M B/C</th>
+                    <th style="font-size: 0.75rem;">dBHL (AC)</th>
+                    <th style="font-size: 0.75rem;">UM B/C</th>
+                    <th style="font-size: 0.75rem;">M B/C</th>
+                </tr>
+            </thead>
+            <tbody id="summaryBody"></tbody>
+            <tfoot>
+                <tr class="avg-row">
+                    <td>Average 500, 1k, 2k</td>
+                    <td colspan="3" id="avg-r-1" class="red-text">-</td>
+                    <td colspan="3" id="avg-l-1" class="blue-text">-</td>
+                </tr>
+                <tr class="avg-row">
+                    <td>Average 1k, 2k, 3k</td>
+                    <td colspan="3" id="avg-r-2" class="red-text">-</td>
+                    <td colspan="3" id="avg-l-2" class="blue-text">-</td>
+                </tr>
+                <tr class="avg-row">
+                    <td>Average 3k, 4k, 6k</td>
+                    <td colspan="3" id="avg-r-3" class="red-text">-</td>
+                    <td colspan="3" id="avg-l-3" class="blue-text">-</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
 </div>
 
 <script>
@@ -78,13 +123,8 @@
         'LBC': {500: '20m', 1000: '30m', 2000: '40', 4000: '55'}
     };
 
-    const CAL = {
-        R_X_START: 125, L_X_START: 766, X_STEP: 76.2, Y_ZERO: 57, Y_STEP_10: 38.1
-    };
-
-    const FREQ_MAP = {
-        250: 0, 500: 1, 1000: 2, 2000: 3, 3000: 3.61, 4000: 4, 6000: 4.61, 8000: 5
-    };
+    const CAL = { R_X_START: 125, L_X_START: 766, X_STEP: 76.2, Y_ZERO: 57, Y_STEP_10: 38.1 };
+    const FREQ_MAP = { 250: 0, 500: 1, 1000: 2, 2000: 3, 3000: 3.61, 4000: 4, 6000: 4.61, 8000: 5 };
 
     const bgImage = new Image();
     bgImage.src = 'template.png'; 
@@ -110,19 +150,67 @@
                 tbody.appendChild(tr);
             });
         }
+        updateSummaryTable();
     }
 
     initGrids();
-    document.querySelectorAll('.in').forEach(i => i.addEventListener('input', drawAll));
+    document.querySelectorAll('.in').forEach(i => i.addEventListener('input', () => {
+        drawAll();
+        updateSummaryTable();
+    }));
 
     function getCoords(type, freq, val) {
         const multiplier = FREQ_MAP[freq];
         const isLeft = type.startsWith('L');
         const startX = isLeft ? CAL.L_X_START : CAL.R_X_START;
-        return {
-            x: startX + (multiplier * CAL.X_STEP),
-            y: CAL.Y_ZERO + (parseFloat(val) * (CAL.Y_STEP_10 / 10))
+        return { x: startX + (multiplier * CAL.X_STEP), y: CAL.Y_ZERO + (parseFloat(val) * (CAL.Y_STEP_10 / 10)) };
+    }
+
+    function updateSummaryTable() {
+        const tbody = document.getElementById('summaryBody');
+        tbody.innerHTML = '';
+        const data = {};
+
+        freqs.forEach(f => {
+            const row = document.createElement('tr');
+            const getVal = (t) => {
+                const el = document.querySelector(`input[data-f="${f}"][data-t="${t}"]`);
+                const val = el ? el.value : '';
+                const isM = val.toLowerCase().includes('m');
+                const num = parseFloat(val);
+                return { raw: val, num: isNaN(num) ? null : num, isM };
+            };
+
+            const rAC = getVal('RAC'), rBC = getVal('RBC'), lAC = getVal('LAC'), lBC = getVal('LBC');
+
+            row.innerHTML = `
+                <td class="freq-col">${f}</td>
+                <td class="red-text">${rAC.raw}</td>
+                <td class="red-text">${!rBC.isM ? rBC.raw : ''}</td>
+                <td class="red-text">${rBC.isM ? rBC.raw : ''}</td>
+                <td class="blue-text">${lAC.raw}</td>
+                <td class="blue-text">${!lBC.isM ? lBC.raw : ''}</td>
+                <td class="blue-text">${lBC.isM ? lBC.raw : ''}</td>
+            `;
+            tbody.appendChild(row);
+        });
+
+        // Calc Averages
+        const calcAvg = (ear, fs) => {
+            let sum = 0, count = 0;
+            fs.forEach(f => {
+                const val = parseFloat(document.querySelector(`input[data-f="${f}"][data-t="${ear}AC"]`).value);
+                if (!isNaN(val)) { sum += val; count++; }
+            });
+            return count > 0 ? Math.round(sum / count) : '-';
         };
+
+        document.getElementById('avg-r-1').innerText = calcAvg('R', [500, 1000, 2000]);
+        document.getElementById('avg-l-1').innerText = calcAvg('L', [500, 1000, 2000]);
+        document.getElementById('avg-r-2').innerText = calcAvg('R', [1000, 2000, 3000]);
+        document.getElementById('avg-l-2').innerText = calcAvg('L', [1000, 2000, 3000]);
+        document.getElementById('avg-r-3').innerText = calcAvg('R', [3000, 4000, 6000]);
+        document.getElementById('avg-l-3').innerText = calcAvg('L', [3000, 4000, 6000]);
     }
 
     function drawAll() {
@@ -173,10 +261,7 @@
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
 
-        // BC Displacement: R moves 3px Left, L moves 3px Right
-        if (type.endsWith('BC')) {
-            x += (type.startsWith('R') ? -3 : 3);
-        }
+        if (type.endsWith('BC')) { x += (type.startsWith('R') ? -3 : 3); }
 
         ctx.beginPath();
         if (type === 'RAC') {
@@ -197,16 +282,11 @@
         if (type === 'RAC') angle = 45; else if (type === 'LAC') angle = 90; else if (type === 'RBC') angle = 135; else if (type === 'LBC') angle = 45;
         const rads = angle * Math.PI / 180;
         let startOffsetX = 0, startOffsetY = 0, arrowLen = 25; 
-
-        if (type.endsWith('BC')) { 
-            arrowLen = 12.5; startOffsetY = 9; 
-            startOffsetX = (type === 'RBC') ? 9 : -9;
-        }
+        if (type.endsWith('BC')) { arrowLen = 12.5; startOffsetY = 9; startOffsetX = (type === 'RBC') ? 9 : -9; }
         else if (type.endsWith('AC')) {
             if (type === 'LAC' && !isMasked) { startOffsetX = 0; startOffsetY = 0; }
             else { const pushOut = isMasked ? 11 : 10; startOffsetX = Math.cos(rads) * pushOut; startOffsetY = Math.sin(rads) * pushOut; arrowLen -= pushOut; }
         }
-
         const startX = x + startOffsetX, startY = y + startOffsetY;
         const endX = startX + Math.cos(rads) * arrowLen, endY = startY + Math.sin(rads) * arrowLen;
         ctx.beginPath(); ctx.lineWidth = 2.5; ctx.moveTo(startX, startY); ctx.lineTo(endX, endY);
