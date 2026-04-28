@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>*Audiogram Creator - Directional NR</title>
+    <title>Audiogram Creator - Fixed Frequency Scaling</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -67,8 +67,25 @@
     const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
     const bcAllowed = [500, 1000, 2000, 4000];
 
+    // Calibration: X_STEP is now the distance between full octaves (e.g., 1000 to 2000)
     const CAL = {
-        R_X_START: 125, L_X_START: 766, X_STEP: 76.2, Y_ZERO: 57, Y_STEP_10: 38.1
+        R_X_START: 125, 
+        L_X_START: 766, 
+        X_STEP: 152.4, // Doubled because 3k/6k are half-steps
+        Y_ZERO: 57, 
+        Y_STEP_10: 38.1
+    };
+
+    // This map determines how many "X_STEPs" a frequency is from the start
+    const FREQ_MAP = {
+        250: 0, 
+        500: 1, 
+        1000: 2, 
+        2000: 3, 
+        3000: 3.5, // Half-way between 2k and 4k
+        4000: 4, 
+        6000: 4.5, // Half-way between 4k and 8k
+        8000: 5
     };
 
     const bgImage = new Image();
@@ -101,11 +118,11 @@
     document.querySelectorAll('.in').forEach(i => i.addEventListener('input', drawAll));
 
     function getCoords(type, freq, val) {
-        const fIdx = freqs.indexOf(parseInt(freq));
+        const multiplier = FREQ_MAP[freq];
         const isLeft = type.startsWith('L');
         const startX = isLeft ? CAL.L_X_START : CAL.R_X_START;
         return {
-            x: startX + (fIdx * CAL.X_STEP),
+            x: startX + (multiplier * CAL.X_STEP),
             y: CAL.Y_ZERO + (parseFloat(val) * (CAL.Y_STEP_10 / 10))
         };
     }
@@ -167,11 +184,11 @@
 
     function drawArrow(x, y, type) {
         let angle;
-        // Logic for your specified directions
-        if (type === 'RAC') angle = 45;        // Bottom Right
-        else if (type === 'LAC') angle = 135;  // Bottom Left
-        else if (type === 'RBC') angle = 135;  // Bottom Left
-        else if (type === 'LBC') angle = 45;   // Bottom Right
+        // Directional Logic
+        if (type === 'RAC') angle = 45;      // Bottom Right
+        else if (type === 'LAC') angle = 90; // Downward
+        else if (type === 'RBC') angle = 135; // Bottom Left
+        else if (type === 'LBC') angle = 45;  // Bottom Right
 
         const rads = angle * Math.PI / 180;
         const len = 25;
