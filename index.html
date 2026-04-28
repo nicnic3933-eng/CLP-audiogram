@@ -71,7 +71,6 @@
     const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
     const bcAllowed = [500, 1000, 2000, 4000];
 
-    // Pre-filled data
     const prefilled = {
         'RAC': {250: '10', 500: '25', 1000: '30', 2000: '40', 3000: '45', 4000: '55', 6000: '65', 8000: '80'},
         'RBC': {500: '20', 1000: '30', 2000: '40', 4000: '55'},
@@ -103,7 +102,6 @@
                 const tr = document.createElement('tr');
                 const acVal = prefilled[side + 'AC'][f] || '';
                 const bcVal = prefilled[side + 'BC'] ? (prefilled[side + 'BC'][f] || '') : '';
-                
                 tr.innerHTML = `
                     <td><strong>${f}</strong></td>
                     <td><input type="text" data-f="${f}" data-t="${side}AC" class="in" value="${acVal}"></td>
@@ -130,7 +128,6 @@
     function drawAll() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (bgImage.complete) ctx.drawImage(bgImage, 0, 0);
-
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
         ['RAC', 'LAC'].forEach(type => {
@@ -157,7 +154,7 @@
 
     function drawSegmentedPath(points) {
         if (points.length < 2) return;
-        const gap = 11;
+        const gap = 13; // Increased gap: Radius + 5px
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i], p2 = points[i+1];
             const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -171,10 +168,16 @@
     }
 
     function renderSymbol(type, pos, val) {
-        const {x, y} = pos;
+        let {x, y} = pos;
         const isM = val.includes('m'), isN = val.includes('n');
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
+
+        // BC Displacement: R goes left (-9), L goes right (+9)
+        if (type.endsWith('BC')) {
+            x += (type.startsWith('R') ? -9 : 9);
+        }
+
         ctx.beginPath();
         if (type === 'RAC') {
             isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath()) : ctx.arc(x,y,8,0,Math.PI*2);
@@ -194,11 +197,16 @@
         if (type === 'RAC') angle = 45; else if (type === 'LAC') angle = 90; else if (type === 'RBC') angle = 135; else if (type === 'LBC') angle = 45;
         const rads = angle * Math.PI / 180;
         let startOffsetX = 0, startOffsetY = 0, arrowLen = 25; 
-        if (type.endsWith('BC')) { arrowLen = 12.5; startOffsetY = 9; startOffsetX = (type === 'RBC') ? 9 : -9; }
+
+        if (type.endsWith('BC')) { 
+            arrowLen = 12.5; startOffsetY = 9; 
+            startOffsetX = (type === 'RBC') ? 9 : -9; // Arrow starts from displaced bracket tips
+        }
         else if (type.endsWith('AC')) {
             if (type === 'LAC' && !isMasked) { startOffsetX = 0; startOffsetY = 0; }
             else { const pushOut = isMasked ? 11 : 10; startOffsetX = Math.cos(rads) * pushOut; startOffsetY = Math.sin(rads) * pushOut; arrowLen -= pushOut; }
         }
+
         const startX = x + startOffsetX, startY = y + startOffsetY;
         const endX = startX + Math.cos(rads) * arrowLen, endY = startY + Math.sin(rads) * arrowLen;
         ctx.beginPath(); ctx.lineWidth = 2.5; ctx.moveTo(startX, startY); ctx.lineTo(endX, endY);
