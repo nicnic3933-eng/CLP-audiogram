@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator - Shortened NR Arrows</title>
+    <title>Audiogram Creator - Fixed Unmasked AC NR</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -67,6 +67,7 @@
     const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
     const bcAllowed = [500, 1000, 2000, 4000];
 
+    // Verification-confirmed scaling
     const CAL = {
         R_X_START: 125, 
         L_X_START: 766, 
@@ -75,6 +76,7 @@
         Y_STEP_10: 38.1
     };
 
+    // Verification-confirmed frequency spacing
     const FREQ_MAP = {
         250: 0, 500: 1, 1000: 2, 2000: 3, 3000: 3.61, 4000: 4, 6000: 4.61, 8000: 5
     };
@@ -123,6 +125,7 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
+        // AC lines ( Skip NR )
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
             const points = allInputs
@@ -138,11 +141,13 @@
             }
         });
 
+        // Symbols
         allInputs.forEach(i => {
             const val = i.value.toLowerCase();
             const db = parseFloat(val);
             if (isNaN(db)) return;
-            renderSymbol(i.dataset.t, getCoords(i.dataset.t, i.dataset.f, val), val);
+            const pos = getCoords(i.dataset.t, i.dataset.f, val);
+            renderSymbol(i.dataset.t, pos, val);
         });
     }
 
@@ -169,13 +174,16 @@
         }
     }
 
+    // UPDATED ARROW LOGIC TO FIX UNMASKED AC OVERLAP
     function drawArrow(x, y, type, isMasked) {
         let angle;
         let startOffsetX = 0;
         let startOffsetY = 0;
-        let arrowLen = 25; // Default shaft length
+        let arrowLen = 25; 
 
-        // Base angles
+        // Base directions per specified logic:
+        // RAC: Bottom-Right (45) | LAC: Straight-Down (90)
+        // RBC: Bottom-Left (135) | LBC: Bottom-Right (45)
         if (type === 'RAC') angle = 45;
         else if (type === 'LAC') angle = 90;
         else if (type === 'RBC') angle = 135;
@@ -184,14 +192,18 @@
         const rads = angle * Math.PI / 180;
 
         if (type.endsWith('BC')) {
-            // BC: Start arrow from bottom of bracket
+            // BC Placement: Shift to open end of bracket (±9x) and bottom tip (+9y)
             startOffsetY = 9; 
-        } else if (type.endsWith('AC') && isMasked) {
-            // AC Masked: Shift start point out and reduce length by same amount
-            const pushOut = 10;
+            startOffsetX = (type === 'RBC') ? 9 : -9;
+        } else if (type.endsWith('AC')) {
+            // AC Logic (Applies to Masked AND Unmasked to fix overlap)
+            // Push start point further outside symbol radius (circle or X)
+            const pushOut = isMasked ? 11 : 10; 
             startOffsetX = Math.cos(rads) * pushOut;
             startOffsetY = Math.sin(rads) * pushOut;
-            arrowLen -= pushOut; // Shorten the shaft
+            
+            // Shorten shaft length by same amount to keep tip in same place grid-wise
+            arrowLen -= pushOut; 
         }
 
         const startX = x + startOffsetX;
@@ -200,11 +212,12 @@
         const endY = startY + Math.sin(rads) * arrowLen;
 
         ctx.beginPath();
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2.5; // Slightly thinner than symbols for contrast
         ctx.moveTo(startX, startY);
         ctx.lineTo(endX, endY);
         
-        const h = 8; // Head size
+        // Arrowhead drawing logic
+        const h = 8; 
         ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
         ctx.moveTo(endX, endY);
         ctx.lineTo(endX - h * Math.cos(rads + Math.PI/6), endY - h * Math.sin(rads + Math.PI/6));
