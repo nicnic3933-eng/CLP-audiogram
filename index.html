@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audiogram Creator Pro</title>
+    <title>Audiogram Creator Pro (Updated NR)</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .app-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); width: fit-content; }
@@ -20,10 +20,12 @@
         .canvas-container { position: relative; border: 2px solid #333; line-height: 0; overflow: auto; max-width: 95vw; }
         canvas { background: #fff; display: block; }
         .toolbar { margin-top: 15px; display: flex; gap: 10px; justify-content: center; }
-        button { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+        button { padding: 10px 25px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: 0.2s;}
         .btn-save { background: #28a745; color: white; }
+        .btn-save:hover { background: #218838; }
         .btn-reset { background: #6c757d; color: white; }
-        .instructions { font-size: 0.85rem; color: #555; margin-top: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; text-align: center;}
+        .btn-reset:hover { background: #5a6268; }
+        .instructions { font-size: 0.85rem; color: #555; margin-top: 15px; background: #e9ecef; padding: 10px; border-radius: 6px; text-align: center; max-width: 600px;}
     </style>
 </head>
 <body>
@@ -52,7 +54,8 @@
     </div>
 
     <div class="instructions">
-        <strong>Shortcut Rules:</strong> [Number] = Unmasked • [Number]<b>m</b> = Masked • [Number]<b>n</b> = NR (Arrow) • [Number]<b>mn</b> = Masked NR
+        <strong>Shortcut Rules:</strong> [Number] = Unmasked • [Number]<b>m</b> = Masked • [Number]<b>n</b> = NR (Arrow) • [Number]<b>mn</b> = Masked NR.
+        <br>BC limited to 500-4000 Hz. AC connected; NR symbols are skipped by lines.
     </div>
 
     <div class="toolbar">
@@ -65,12 +68,9 @@
     const canvas = document.getElementById('audioCanvas');
     const ctx = canvas.getContext('2d');
 
-    // Frequencies per your requirement
     const freqs = [250, 500, 1000, 2000, 3000, 4000, 6000, 8000];
     const bcAllowed = [500, 1000, 2000, 4000];
 
-    // --- CALIBRATION ---
-    // Adjust these slightly to hit the exact center of your lines
     const CAL = {
         R_X_START: 132,   // X-pixel for Right 250Hz
         L_X_START: 635,   // X-pixel for Left 250Hz
@@ -83,7 +83,6 @@
     bgImage.src = 'template.png'; 
     
     bgImage.onload = () => {
-        // Fix for the "squeezing" issue: Canvas matches image natural size
         canvas.width = bgImage.naturalWidth;
         canvas.height = bgImage.naturalHeight;
         drawAll();
@@ -125,7 +124,7 @@
 
         const allInputs = Array.from(document.querySelectorAll('.in')).filter(i => i.value);
 
-        // 1. Draw AC Connecting Lines (Skip NR)
+        // AC Connecting Lines (Skip NR)
         ['RAC', 'LAC'].forEach(type => {
             const color = type.startsWith('R') ? 'red' : 'blue';
             const points = allInputs
@@ -134,14 +133,14 @@
                 .sort((a, b) => a.f - b.f);
 
             if (points.length > 1) {
-                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 3;
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 3; ctx.lineJoin = "round";
                 ctx.moveTo(points[0].x, points[0].y);
                 points.forEach(p => ctx.lineTo(p.x, p.y));
                 ctx.stroke();
             }
         });
 
-        // 2. Render Symbols
+        // Individual Symbols
         allInputs.forEach(i => {
             const val = i.value.toLowerCase();
             const db = parseFloat(val);
@@ -155,42 +154,90 @@
         const {x, y} = pos;
         const isM = val.includes('m'), isN = val.includes('n');
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
-        ctx.lineWidth = 3; 
+        ctx.fillStyle = type.startsWith('R') ? 'red' : 'blue'; // Some arrows use fill
+        ctx.lineWidth = 3; ctx.lineCap = "round";
         ctx.beginPath();
 
         if (type === 'RAC') {
-            isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath()) : ctx.arc(x,y,8,0,Math.PI*2);
+            isM ? (ctx.moveTo(x,y-9), ctx.lineTo(x-9,y+7), ctx.lineTo(x+9,y+7), ctx.closePath(), ctx.stroke()) 
+                : (ctx.arc(x,y,8,0,Math.PI*2), ctx.stroke());
         } else if (type === 'LAC') {
-            isM ? ctx.rect(x-8,y-8,16,16) : (ctx.moveTo(x-8,y-8), ctx.lineTo(x+8,y+8), ctx.moveTo(x+8,y-8), ctx.lineTo(x-8,y+8));
+            isM ? (ctx.rect(x-8,y-8,16,16), ctx.stroke()) 
+                : (ctx.moveTo(x-8,y-8), ctx.lineTo(x+8,y+8), ctx.moveTo(x+8,y-8), ctx.lineTo(x-8,y+8), ctx.stroke());
         } else if (type === 'RBC') {
-            isM ? (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x+9,y+9)) : (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y), ctx.lineTo(x+9,y+9));
+            // New [ ] bracket dimensions
+            isM ? (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x+9,y+9), ctx.stroke()) 
+                : (ctx.moveTo(x+9,y-9), ctx.lineTo(x,y), ctx.lineTo(x+9,y+9), ctx.stroke());
         } else if (type === 'LBC') {
-            isM ? (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x-9,y+9)) : (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y), ctx.lineTo(x-9,y+9));
+            isM ? (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y-9), ctx.lineTo(x,y+9), ctx.lineTo(x-9,y+9), ctx.stroke()) 
+                : (ctx.moveTo(x-9,y-9), ctx.lineTo(x,y), ctx.lineTo(x-9,y+9), ctx.stroke());
         }
-        ctx.stroke();
 
-        if (isN) drawNR(x, y, type.startsWith('R'));
+        if (isN) {
+            ctx.stroke(); // Finish base symbol stroke first
+            drawNRArrow(ctx, x, y, type);
+        }
     }
 
-    function drawNR(x, y, isRight) {
-        const angle = isRight ? (45 * Math.PI / 180) : (135 * Math.PI / 180);
-        const len = 25;
-        const endX = x + Math.cos(angle) * len;
-        const endY = y + Math.sin(angle) * len;
+    // DRAWING NEW NR ARROWS BASED ON PROVIDED IMAGE
+    function drawNRArrow(ctx, x, y, type) {
+        const side = type.startsWith('R') ? 'R' : 'L';
+        const con = type.endsWith('C') ? 'C' : ''; // Just handling AC/BC based on type name
+        // (Assuming you'll adjust this function based on whether 'con' is AC or BC)
+        
+        ctx.lineWidth = 2.5; ctx.beginPath(); ctx.setLineDash([]); // Reset dash for arrows
 
-        ctx.beginPath(); ctx.lineWidth = 2.5;
+        if (type === 'RAC') {
+            // UNMASKED: AC R (Circle with thin arrow pointing 45 degrees down-right)
+            drawAngledNR(ctx, x, y, 45); 
+        } else if (type === 'RBC') {
+            // UNMASKED: BC R (< with zig-zag arrow pointing down-right)
+            drawZigZagNR(ctx, x, y, true);
+        } else if (type === 'LAC') {
+            // UNMASKED: AC L (X with thick arrow pointing 135 degrees down-left)
+            ctx.lineWidth = 4; // Thick arrow from image
+            drawAngledNR(ctx, x, y, 135); 
+        } else if (type === 'LBC') {
+            // UNMASKED: BC L (> with zig-zag arrow pointing down-left)
+            drawZigZagNR(ctx, x, y, false);
+        }
+    }
+
+    function drawAngledNR(ctx, x, y, angle) {
+        const rads = angle * Math.PI / 180;
+        const len = 25;
+        const endX = x + Math.cos(rads) * len;
+        const endY = y + Math.sin(rads) * len;
+
         ctx.moveTo(x, y); ctx.lineTo(endX, endY);
         
         const h = 8;
-        ctx.lineTo(endX - h * Math.cos(angle - Math.PI/6), endY - h * Math.sin(angle - Math.PI/6));
+        ctx.lineTo(endX - h * Math.cos(rads - Math.PI/6), endY - h * Math.sin(rads - Math.PI/6));
         ctx.moveTo(endX, endY);
-        ctx.lineTo(endX - h * Math.cos(angle + Math.PI/6), endY - h * Math.sin(angle + Math.PI/6));
+        ctx.lineTo(endX - h * Math.cos(rads + Math.PI/6), endY - h * Math.sin(rads + Math.PI/6));
         ctx.stroke();
     }
 
+    function drawZigZagNR(ctx, x, y, isRight) {
+        const scale = isRight ? 1 : -1;
+        const pts = [
+            {x:0, y:0}, {x:5, y:8}, {x:-5, y:12}, {x:5, y:20} // Relative points for the zig-zag
+        ];
+        
+        ctx.moveTo(x + pts[0].x * scale, y + pts[0].y);
+        for(let i=1; i<pts.length; i++) {
+            ctx.lineTo(x + pts[i].x * scale, y + pts[i].y);
+        }
+        ctx.stroke();
+    }
+
+    // Masked NR styles are not standard; I'll assume you just add the above arrow styles 
+    // to the masked symbols. 
+    // If you need unique arrows for masked, I would need a specific reference image for that.
+
     function downloadImage() {
         const link = document.createElement('a');
-        link.download = `Audiogram_${new Date().toLocaleDateString()}.png`;
+        link.download = `Audiogram_NR_Update_${new Date().getTime()}.png`;
         link.href = canvas.toDataURL('image/png');
         link.click();
     }
