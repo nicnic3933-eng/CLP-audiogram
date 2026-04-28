@@ -154,7 +154,7 @@
 
     function drawSegmentedPath(points) {
         if (points.length < 2) return;
-        const gap = 13; // Increased gap: Radius + 5px
+        const gap = 16; // Now Radius + 8px
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i], p2 = points[i+1];
             const dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -173,9 +173,9 @@
         ctx.strokeStyle = type.startsWith('R') ? 'red' : 'blue';
         ctx.lineWidth = 3; ctx.lineCap = "round";
 
-        // BC Displacement: R goes left (-9), L goes right (+9)
+        // BC Displacement: R goes left (-3), L goes right (+3)
         if (type.endsWith('BC')) {
-            x += (type.startsWith('R') ? -9 : 9);
+            x += (type.startsWith('R') ? -3 : 3);
         }
 
         ctx.beginPath();
@@ -200,7 +200,7 @@
 
         if (type.endsWith('BC')) { 
             arrowLen = 12.5; startOffsetY = 9; 
-            startOffsetX = (type === 'RBC') ? 9 : -9; // Arrow starts from displaced bracket tips
+            startOffsetX = (type === 'RBC') ? 9 : -9;
         }
         else if (type.endsWith('AC')) {
             if (type === 'LAC' && !isMasked) { startOffsetX = 0; startOffsetY = 0; }
