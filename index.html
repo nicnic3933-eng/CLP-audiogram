@@ -40,10 +40,9 @@
         .summary-table th, .summary-table td { 
             border: 1px solid #000; padding: 5px; color: #000; font-weight: normal;
             background-color: transparent !important; text-align: center; vertical-align: middle;
-            height: 25px; /* Keep row heights consistent between tables */
+            height: 25px; /* Ensures vertical alignment matches across tables */
         }
         
-        /* Specific adjustments for the split */
         #freqTable { border-right: none; }
         #dataTable { border-left: 1px solid #000; }
         
@@ -95,7 +94,7 @@
     <div class="summary-container">
         <table class="summary-table" id="freqTable">
             <thead>
-                <tr><th rowspan="2" style="height: 52px;">Frequency (Hz)</th></tr>
+                <tr><th rowspan="2">Frequency (Hz)</th></tr>
                 <tr></tr>
             </thead>
             <tbody id="summaryFreqBody"></tbody>
@@ -216,12 +215,10 @@
         dataBody.innerHTML = '';
 
         summaryFreqs.forEach(f => {
-            // Populate Frequency Table
             const fRow = document.createElement('tr');
             fRow.innerHTML = `<td>${f}</td>`;
             freqBody.appendChild(fRow);
 
-            // Populate Data Table
             const dRow = document.createElement('tr');
             const clean = (t) => {
                 const el = document.querySelector(`input[data-f="${f}"][data-t="${t}"]`);
